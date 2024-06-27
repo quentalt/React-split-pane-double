@@ -1,7 +1,7 @@
 // src/components/Splitter.tsx
-import React, { useState, useRef, CSSProperties } from 'react';
+import React, { useState, useRef, useEffect, CSSProperties } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowsAlt } from '@fortawesome/free-solid-svg-icons';
+import { faArrowsAltH, faArrowsAltV } from '@fortawesome/free-solid-svg-icons';
 import './Splitter.css';
 
 interface SplitterProps {
@@ -19,6 +19,8 @@ interface SplitterProps {
   containerStyle?: CSSProperties;
 }
 
+const LOCAL_STORAGE_KEY = 'splitterSizes';
+
 export const Splitter: React.FC<SplitterProps> = ({
   initialHorizontalSize = 50,
   initialVerticalSize = 50,
@@ -33,32 +35,57 @@ export const Splitter: React.FC<SplitterProps> = ({
   handleStyle = {},
   containerStyle = {},
 }) => {
-  const [horizontalSize, setHorizontalSize] = useState(initialHorizontalSize);
-  const [verticalSize, setVerticalSize] = useState(initialVerticalSize);
+  const [horizontalSize, setHorizontalSize] = useState(() => {
+    const savedSizes = localStorage.getItem(LOCAL_STORAGE_KEY);
+    return savedSizes ? JSON.parse(savedSizes).horizontalSize : initialHorizontalSize;
+  });
+  const [verticalSize, setVerticalSize] = useState(() => {
+    const savedSizes = localStorage.getItem(LOCAL_STORAGE_KEY);
+    return savedSizes ? JSON.parse(savedSizes).verticalSize : initialVerticalSize;
+  });
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const handleMouseMove = (e: MouseEvent) => {
+  const handleMouseUp = () => {
+    document.removeEventListener('mousemove', handleHorizontalMouseMove);
+    document.removeEventListener('mousemove', handleVerticalMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleHorizontalMouseMove = (e: MouseEvent) => {
     if (containerRef.current) {
-      const { width, height, left, top } = containerRef.current.getBoundingClientRect();
+      const { width, left } = containerRef.current.getBoundingClientRect();
       const newHorizontalSize = ((e.clientX - left) / width) * 100;
-      const newVerticalSize = ((e.clientY - top) / height) * 100;
       setHorizontalSize(newHorizontalSize);
-      setVerticalSize(newVerticalSize);
       if (onResize) {
-        onResize(newHorizontalSize, newVerticalSize);
+        onResize(newHorizontalSize, verticalSize);
       }
     }
   };
 
-  const handleMouseUp = () => {
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', handleMouseUp);
+  const handleVerticalMouseMove = (e: MouseEvent) => {
+    if (containerRef.current) {
+      const { height, top } = containerRef.current.getBoundingClientRect();
+      const newVerticalSize = ((e.clientY - top) / height) * 100;
+      setVerticalSize(newVerticalSize);
+      if (onResize) {
+        onResize(horizontalSize, newVerticalSize);
+      }
+    }
   };
 
-  const handleMouseDown = () => {
-    document.addEventListener('mousemove', handleMouseMove);
+  const handleHorizontalMouseDown = () => {
+    document.addEventListener('mousemove', handleHorizontalMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
   };
+
+  const handleVerticalMouseDown = () => {
+    document.addEventListener('mousemove', handleVerticalMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ horizontalSize, verticalSize }));
+  }, [horizontalSize, verticalSize]);
 
   return (
     <div
@@ -91,15 +118,38 @@ export const Splitter: React.FC<SplitterProps> = ({
         Pane 4
       </div>
       <div
-        className={`splitter-handle ${handleClassName}`}
-        onMouseDown={handleMouseDown}
+        className={`splitter-handle horizontal-handle ${handleClassName}`}
+        onMouseDown={handleHorizontalMouseDown}
         style={{
           ...handleStyle,
-          top: `${verticalSize}%`,
           left: `${horizontalSize}%`,
+          top: 0,
+          bottom: 0,
+          cursor: 'ew-resize',
+          transform: 'translateX(-50%)',
         }}
+        aria-label="Resize horizontally"
+        role="separator"
+        aria-orientation="horizontal"
       >
-        <FontAwesomeIcon icon={faArrowsAlt} />
+        <FontAwesomeIcon icon={faArrowsAltH} size="xs" />
+      </div>
+      <div
+        className={`splitter-handle vertical-handle ${handleClassName}`}
+        onMouseDown={handleVerticalMouseDown}
+        style={{
+          ...handleStyle,
+          left: 0,
+          right: 0,
+          top: `${verticalSize}%`,
+          cursor: 'ns-resize',
+          transform: 'translateY(-50%)',
+        }}
+        aria-label="Resize vertically"
+        role="separator"
+        aria-orientation="vertical"
+      >
+        <FontAwesomeIcon icon={faArrowsAltV} size="xs" />
       </div>
     </div>
   );
